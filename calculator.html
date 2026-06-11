@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CALCVLT — Scientific Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           #0d0f14;
+    --surface:      #161b26;
+    --surface2:     #1e2535;
+    --surface3:     #252d40;
+    --border:       #2a3350;
+    --accent:       #4f8ef7;
+    --accent-glow:  rgba(79,142,247,0.25);
+    --accent2:      #a78bfa;
+    --danger:       #f97316;
+    --text:         #e8edf5;
+    --text-muted:   #8896b0;
+    --text-dim:     #4a5568;
+    --equals:       #4f8ef7;
+    --equals-glow:  rgba(79,142,247,0.4);
+    --radius:       14px;
+    --radius-sm:    8px;
+    --mono:         'Space Mono', monospace;
+    --sans:         'Space Grotesk', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--sans);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background-image:
+      linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .site-header { text-align: center; margin-bottom: 2rem; }
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--text-muted); }
+  .tagline {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .calc-shell {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(79,142,247,0.08),
+      0 32px 64px rgba(0,0,0,0.6),
+      0 0 80px rgba(79,142,247,0.05);
+  }
+
+  .display {
+    padding: 1.5rem 1.75rem 1rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: relative;
+  }
+  .display-history { font-family:var(--mono);font-size:0.78rem;color:var(--text-dim);min-height:1.2em;margin-bottom:0.4rem;letter-spacing:0.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .display-expr    { font-family:var(--mono);font-size:1.2rem;color:var(--text-muted);min-height:1.5em;margin-bottom:0.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .display-main    { font-family:var(--mono);font-size:2.6rem;font-weight:700;color:var(--text);line-height:1;letter-spacing:-0.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color 0.15s; }
+  .display-main.has-result { color: var(--accent); }
+  .display-main.is-error   { color: var(--danger); font-size:1.8rem; }
+
+  .cursor { display:inline-block;width:2px;height:2rem;background:var(--accent);margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .indicators { display:flex;gap:0.6rem;margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid var(--border); }
+  .ind { font-family:var(--mono);font-size:0.62rem;letter-spacing:0.08em;color:var(--text-dim);padding:2px 7px;border:1px solid var(--border);border-radius:4px;transition:all 0.2s; }
+  .ind.active { color:var(--accent);border-color:var(--accent);background:var(--accent-glow); }
+
+  .mode-tabs { display:flex;background:var(--surface2);border-bottom:1px solid var(--border); }
+  .mode-tab {
+    flex:1;padding:0.6rem;font-family:var(--sans);font-size:0.72rem;font-weight:600;
+    letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);background:transparent;
+    border:none;cursor:pointer;transition:all 0.2s;
+  }
+  .mode-tab.active { color:var(--accent);background:var(--surface3);box-shadow:inset 0 -2px 0 var(--accent); }
+  .mode-tab:hover:not(.active) { color:var(--text-muted); }
+
+  .keypad-wrapper { padding: 1rem; }
+  .keypad { display:grid;gap:8px; }
+  .keypad.standard   { grid-template-columns:repeat(4,1fr); }
+  .keypad.scientific { grid-template-columns:repeat(5,1fr); }
+
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  .btn {
+    position:relative;padding:0;height:58px;border:1px solid var(--border);
+    border-radius:var(--radius);font-family:var(--mono);font-size:1rem;font-weight:400;
+    cursor:pointer;transition:all 0.12s ease;user-select:none;overflow:hidden;
+    background:var(--surface2);color:var(--text);display:flex;align-items:center;justify-content:center;
+  }
+  .btn::after { content:'';position:absolute;inset:0;background:white;opacity:0;transition:opacity 0.1s;border-radius:inherit; }
+  .btn:active::after { opacity:0.06; }
+  .btn:hover { border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+  .btn:active { transform:translateY(0); }
+
+  .btn.digit    { background:var(--surface3);font-size:1.15rem;font-weight:700; }
+  .btn.op       { background:var(--surface2);color:var(--accent);font-size:1.15rem; }
+  .btn.fn       { background:var(--surface2);color:var(--accent2);font-size:0.8rem;letter-spacing:0.04em; }
+  .btn.clear    { background:rgba(249,115,22,0.12);color:var(--danger);border-color:rgba(249,115,22,0.25); }
+  .btn.clear:hover { border-color:var(--danger); }
+  .btn.backspace { background:rgba(249,115,22,0.08);color:var(--danger); }
+  .btn.equals   { background:var(--equals);color:#fff;border-color:var(--equals);font-size:1.4rem;box-shadow:0 4px 20px var(--equals-glow); }
+  .btn.equals:hover { background:#5f9aff;border-color:#5f9aff;box-shadow:0 6px 28px var(--equals-glow); }
+  .btn.span2 { grid-column:span 2; }
+  .btn.zero  { justify-content:flex-start;padding-left:22px; }
+
+  .history-toggle {
+    display:flex;align-items:center;justify-content:space-between;padding:0.5rem 1rem;
+    background:var(--surface2);border-top:1px solid var(--border);cursor:pointer;
+    font-size:0.7rem;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.08em;transition:color 0.2s;
+  }
+  .history-toggle:hover { color:var(--text-muted); }
+  .history-toggle svg { transition:transform 0.2s; }
+  .history-toggle.open svg { transform:rotate(180deg); }
+
+  .history-panel { max-height:0;overflow:hidden;transition:max-height 0.35s ease;background:var(--bg);border-top:none; }
+  .history-panel.open { max-height:220px;border-top:1px solid var(--border); }
+  .history-list { padding:0.75rem 1rem;display:flex;flex-direction:column-reverse;gap:0.5rem;max-height:220px;overflow-y:auto; }
+  .history-item { display:flex;justify-content:space-between;align-items:baseline;gap:1rem;cursor:pointer;padding:0.4rem 0.5rem;border-radius:var(--radius-sm);transition:background 0.15s; }
+  .history-item:hover { background:var(--surface2); }
+  .history-item .h-expr   { font-family:var(--mono);font-size:0.72rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .history-item .h-result { font-family:var(--mono);font-size:0.85rem;color:var(--accent);flex-shrink:0; }
+  .history-empty { padding:1.2rem;text-align:center;font-size:0.72rem;color:var(--text-dim);letter-spacing:0.06em; }
+
+  .site-footer { margin-top:1.5rem;font-size:0.68rem;color:var(--text-dim);letter-spacing:0.08em;text-align:center; }
+  .site-footer a { color:var(--accent);text-decoration:none; }
+
+  select, input[type="number"], input[type="text"] {
+    -webkit-appearance: none;
+  }
+
+  @media (max-width:440px) {
+    .calc-shell { border-radius:18px; }
+    .btn { height:52px;font-size:0.9rem; }
+    .display-main { font-size:2rem; }
+    .keypad { gap:6px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">CALC<span>VLT</span></div>
+  <div class="tagline">Scientific Calculator</div>
+</header>
+
+<main class="calc-shell" role="main">
+
+  <div class="display" id="display" aria-live="polite">
+    <div class="display-history" id="histLine"></div>
+    <div class="display-expr"   id="exprLine"></div>
+    <div class="display-main"   id="mainLine">0<span class="cursor"></span></div>
+    <div class="indicators">
+      <span class="ind" id="ind-deg">DEG</span>
+      <span class="ind" id="ind-rad">RAD</span>
+      <span class="ind" id="ind-inv">INV</span>
+      <span class="ind" id="ind-hyp">HYP</span>
+    </div>
+  </div>
+
+  <div class="mode-tabs" role="tablist">
+    <button class="mode-tab active" onclick="switchMode('standard')">Standard</button>
+    <button class="mode-tab"        onclick="switchMode('scientific')">Scientific</button>
+    <button class="mode-tab"        onclick="switchMode('converter')">Convert</button>
+  </div>
+
+  <div class="keypad-wrapper">
+
+    <!-- STANDARD -->
+    <div class="panel active" id="panel-standard">
+      <div class="keypad standard">
+        <button class="btn clear"     onclick="clearAll()">AC</button>
+        <button class="btn backspace" onclick="backspace()">⌫</button>
+        <button class="btn op"        onclick="inp('%')">%</button>
+        <button class="btn op"        onclick="inp('/')">÷</button>
+
+        <button class="btn digit" onclick="inp('7')">7</button>
+        <button class="btn digit" onclick="inp('8')">8</button>
+        <button class="btn digit" onclick="inp('9')">9</button>
+        <button class="btn op"    onclick="inp('*')">×</button>
+
+        <button class="btn digit" onclick="inp('4')">4</button>
+        <button class="btn digit" onclick="inp('5')">5</button>
+        <button class="btn digit" onclick="inp('6')">6</button>
+        <button class="btn op"    onclick="inp('-')">−</button>
+
+        <button class="btn digit" onclick="inp('1')">1</button>
+        <button class="btn digit" onclick="inp('2')">2</button>
+        <button class="btn digit" onclick="inp('3')">3</button>
+        <button class="btn op"    onclick="inp('+')">+</button>
+
+        <button class="btn digit span2 zero" onclick="inp('0')">0</button>
+        <button class="btn digit"            onclick="inp('.')">.</button>
+        <button class="btn equals"           onclick="calculate()">=</button>
+      </div>
+    </div>
+
+    <!-- SCIENTIFIC -->
+    <div class="panel" id="panel-scientific">
+      <div class="keypad scientific">
+        <button class="btn fn" onclick="toggleInv()">INV</button>
+        <button class="btn fn" onclick="toggleHyp()">HYP</button>
+        <button class="btn fn" id="btn-angle" onclick="toggleAngle()">DEG</button>
+        <button class="btn fn" onclick="memStore()">MS</button>
+        <button class="btn fn" onclick="memRecall()">MR</button>
+
+        <button class="btn fn" id="btn-sin" onclick="inpFn('sin')">sin</button>
+        <button class="btn fn" id="btn-cos" onclick="inpFn('cos')">cos</button>
+        <button class="btn fn" id="btn-tan" onclick="inpFn('tan')">tan</button>
+        <button class="btn fn" onclick="inpFn('log')">log</button>
+        <button class="btn fn" onclick="inpFn('ln')">ln</button>
+
+        <button class="btn fn" onclick="inpFn('sqrt')">√x</button>
+        <button class="btn fn" onclick="inpFn('cbrt')">∛x</button>
+        <button class="btn fn" onclick="inp('^')">xʸ</button>
+        <button class="btn fn" onclick="inp('**2')">x²</button>
+        <button class="btn fn" onclick="inpFn('abs')">|x|</button>
+
+        <button class="btn fn" onclick="inp('π')">π</button>
+        <button class="btn fn" onclick="inp('e')">e</button>
+        <button class="btn fn" onclick="inp('(')">( </button>
+        <button class="btn fn" onclick="inp(')')"> )</button>
+        <button class="btn fn" onclick="inp('1/')">1/x</button>
+
+        <button class="btn clear"     onclick="clearAll()">AC</button>
+        <button class="btn backspace" onclick="backspace()">⌫</button>
+        <button class="btn op"        onclick="inp('%')">%</button>
+        <button class="btn op"        onclick="inp('/')">÷</button>
+        <button class="btn op"        onclick="inp('*')">×</button>
+
+        <button class="btn digit" onclick="inp('7')">7</button>
+        <button class="btn digit" onclick="inp('8')">8</button>
+        <button class="btn digit" onclick="inp('9')">9</button>
+        <button class="btn op"    onclick="inp('-')">−</button>
+        <button class="btn op"    onclick="inp('+')">+</button>
+
+        <button class="btn digit" onclick="inp('4')">4</button>
+        <button class="btn digit" onclick="inp('5')">5</button>
+        <button class="btn digit" onclick="inp('6')">6</button>
+        <button class="btn digit" onclick="inp('1')">1</button>
+        <button class="btn digit" onclick="inp('2')">2</button>
+
+        <button class="btn digit" onclick="inp('3')">3</button>
+        <button class="btn digit span2 zero" onclick="inp('0')">0</button>
+        <button class="btn digit" onclick="inp('.')">.</button>
+        <button class="btn equals" onclick="calculate()">=</button>
+      </div>
+    </div>
+
+    <!-- CONVERTER -->
+    <div class="panel" id="panel-converter">
+      <div style="padding:0.5rem 0">
+        <select id="convType" onchange="updateConvUnits()" style="width:100%;padding:0.6rem 0.8rem;background:var(--surface3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--sans);font-size:0.85rem;margin-bottom:0.75rem;outline:none;cursor:pointer">
+          <option value="length">Length</option>
+          <option value="mass">Mass / Weight</option>
+          <option value="temp">Temperature</option>
+          <option value="area">Area</option>
+          <option value="volume">Volume</option>
+          <option value="speed">Speed</option>
+          <option value="time">Time</option>
+          <option value="data">Data Storage</option>
+        </select>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <div style="flex:1">
+            <input type="number" id="convInput" oninput="doConvert()" placeholder="Value" style="width:100%;padding:0.65rem 0.8rem;background:var(--surface3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--mono);font-size:0.95rem;outline:none;">
+            <select id="convFrom" onchange="doConvert()" style="width:100%;margin-top:5px;padding:0.55rem 0.7rem;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--sans);font-size:0.8rem;outline:none;cursor:pointer"></select>
+          </div>
+          <div style="font-size:1.4rem;color:var(--accent);padding:0 0.25rem">⇄</div>
+          <div style="flex:1">
+            <input type="text" id="convOutput" readonly placeholder="Result" style="width:100%;padding:0.65rem 0.8rem;background:var(--bg);color:var(--accent);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--mono);font-size:0.95rem;outline:none;">
+            <select id="convTo" onchange="doConvert()" style="width:100%;margin-top:5px;padding:0.55rem 0.7rem;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--sans);font-size:0.8rem;outline:none;cursor:pointer"></select>
+          </div>
+        </div>
+        <p style="font-size:0.65rem;color:var(--text-dim);letter-spacing:0.06em;margin-top:0.75rem;text-align:center">UNIT CONVERTER — INSTANT REAL-TIME CONVERSION</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="history-toggle" id="histToggle" onclick="toggleHistory()">
+    <span>HISTORY</span>
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+      <path d="M1 1L6 6L11 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="history-panel" id="histPanel">
+    <div class="history-list" id="histList">
+      <div class="history-empty">No history yet</div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  PHP · JavaScript · CSS &nbsp;|&nbsp; CALCVLT Scientific Calculator
+</footer>
+
+<script>
+/* ── STATE ── */
+let expression  = '';
+let displayVal  = '0';
+let lastResult  = null;
+let freshResult = false;
+let memory      = 0;
+let angleMode   = 'deg';
+let invMode     = false;
+let hypMode     = false;
+let history     = [];
+
+/* ── DISPLAY ── */
+function updateDisplay() {
+  const main   = document.getElementById('mainLine');
+  const exprEl = document.getElementById('exprLine');
+
+  exprEl.textContent = expression || '';
+
+  if (displayVal === 'Error') {
+    main.textContent = 'Error';
+    main.className = 'display-main is-error';
+  } else if (freshResult && lastResult !== null) {
+    main.textContent = formatNum(lastResult);
+    main.className = 'display-main has-result';
+  } else {
+    main.innerHTML = (displayVal || '0') + '<span class="cursor"></span>';
+    main.className = 'display-main';
+  }
+
+  document.getElementById('ind-deg').className = 'ind' + (angleMode==='deg'?' active':'');
+  document.getElementById('ind-rad').className = 'ind' + (angleMode==='rad'?' active':'');
+  document.getElementById('ind-inv').className = 'ind' + (invMode?' active':'');
+  document.getElementById('ind-hyp').className = 'ind' + (hypMode?' active':'');
+}
+
+function formatNum(n) {
+  if (n === null || n === undefined) return '0';
+  if (!isFinite(n)) return n > 0 ? '∞' : '-∞';
+  if (Math.abs(n) > 1e15 || (Math.abs(n) < 1e-7 && n !== 0))
+    return n.toExponential(6).replace(/\.?0+e/, 'e');
+  return parseFloat(n.toPrecision(12)).toString();
+}
+
+/* ── INPUT ── */
+function inp(val) {
+  if (freshResult) {
+    if ('+-*/^%'.includes(val) || val === '**2') {
+      expression = formatNum(lastResult);
+      displayVal = expression;
+    } else {
+      expression = '';
+      displayVal = '0';
+    }
+    freshResult = false;
+  }
+  if (val === '1/') {
+    const cur = expression || displayVal;
+    expression = '1/(' + cur + ')';
+    displayVal = expression;
+    updateDisplay(); return;
+  }
+  expression += val;
+  displayVal = expression.replace(/\*/g,'×').replace(/\//g,'÷').replace(/\*\*/g,'^');
+  updateDisplay();
+}
+
+function inpFn(fn) {
+  if (freshResult) {
+    const v = formatNum(lastResult);
+    expression  = fn + '(' + v + ')';
+    displayVal  = expression;
+    freshResult = false;
+    updateDisplay(); return;
+  }
+  expression += fn + '(';
+  displayVal  = expression;
+  updateDisplay();
+}
+
+function clearAll() {
+  expression = ''; displayVal = '0'; lastResult = null; freshResult = false;
+  document.getElementById('histLine').textContent = '';
+  updateDisplay();
+}
+
+function backspace() {
+  if (freshResult) { clearAll(); return; }
+  expression = expression.slice(0, -1);
+  displayVal = expression || '0';
+  updateDisplay();
+}
+
+/* ── CALCULATE ── */
+function calculate() {
+  if (!expression) return;
+  const raw  = expression;
+  let   expr = raw
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/π/g,'('+Math.PI+')')
+    .replace(/\be\b/g,'('+Math.E+')')
+    .replace(/(\d+(?:\.\d+)?)\^(\d+(?:\.\d+)?)/g,'Math.pow($1,$2)');
+
+  if (angleMode === 'deg') {
+    expr = expr
+      .replace(/\bsin\(/g,'Math.sin(Math.PI/180*')
+      .replace(/\bcos\(/g,'Math.cos(Math.PI/180*')
+      .replace(/\btan\(/g,'Math.tan(Math.PI/180*');
+  } else {
+    expr = expr
+      .replace(/\bsin\(/g,'Math.sin(')
+      .replace(/\bcos\(/g,'Math.cos(')
+      .replace(/\btan\(/g,'Math.tan(');
+  }
+
+  expr = expr
+    .replace(/\bsqrt\(/g,'Math.sqrt(')
+    .replace(/\bcbrt\(/g,'Math.cbrt(')
+    .replace(/\blog\(/g,'Math.log10(')
+    .replace(/\bln\(/g,'Math.log(')
+    .replace(/\babs\(/g,'Math.abs(');
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const res = new Function('return (' + expr + ')')();
+    if (!isFinite(res) && isNaN(res)) throw new Error();
+    lastResult  = res;
+    freshResult = true;
+    document.getElementById('histLine').textContent = raw + ' =';
+    addHistory(raw, formatNum(res));
+    updateDisplay();
+  } catch(e) {
+    displayVal  = 'Error';
+    freshResult = false;
+    updateDisplay();
+  }
+}
+
+/* ── HISTORY ── */
+function addHistory(expr, result) {
+  history.unshift({ expr, result });
+  if (history.length > 30) history.pop();
+  renderHistory();
+}
+function renderHistory() {
+  const list = document.getElementById('histList');
+  if (!history.length) { list.innerHTML='<div class="history-empty">No history yet</div>'; return; }
+  list.innerHTML = history.map((h,i) =>
+    `<div class="history-item" onclick="recallHistory(${i})">
+      <span class="h-expr">${h.expr}</span>
+      <span class="h-result">${h.result}</span>
+    </div>`).join('');
+}
+function recallHistory(i) {
+  const h = history[i];
+  expression  = h.result; displayVal = h.result;
+  lastResult  = parseFloat(h.result); freshResult = true;
+  updateDisplay();
+}
+function toggleHistory() {
+  document.getElementById('histPanel').classList.toggle('open');
+  document.getElementById('histToggle').classList.toggle('open');
+}
+
+/* ── MODES ── */
+function switchMode(mode) {
+  const modes = ['standard','scientific','converter'];
+  document.querySelectorAll('.mode-tab').forEach((t,i)=> t.classList.toggle('active', modes[i]===mode));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+mode).classList.add('active');
+  if (mode==='converter') updateConvUnits();
+}
+function toggleAngle() {
+  angleMode = angleMode==='deg' ? 'rad' : 'deg';
+  document.getElementById('btn-angle').textContent = angleMode.toUpperCase();
+  updateDisplay();
+}
+function toggleInv()  { invMode = !invMode;  updateDisplay(); }
+function toggleHyp()  { hypMode = !hypMode;  updateDisplay(); }
+
+/* ── MEMORY ── */
+function memStore()  { memory = lastResult ?? parseFloat(displayVal) ?? 0; }
+function memRecall() { expression=memory.toString(); displayVal=formatNum(memory); freshResult=false; updateDisplay(); }
+
+/* ── KEYBOARD ── */
+document.addEventListener('keydown', e => {
+  if (e.key>='0'&&e.key<='9') { inp(e.key); return; }
+  const map = {'+':'+','-':'-','*':'*','/':'/','%':'%','(':' (',')':')','.'  :'.','Enter':'=','Backspace':'bs','Escape':'ac','Delete':'ac'};
+  const v = map[e.key];
+  if (!v) return;
+  e.preventDefault();
+  if (v==='=') calculate();
+  else if (v==='bs') backspace();
+  else if (v==='ac') clearAll();
+  else inp(v);
+});
+
+/* ── UNIT CONVERTER ── */
+const UNITS = {
+  length:  { m:1, km:0.001, cm:100, mm:1000, mi:0.000621371, yd:1.09361, ft:3.28084, inch:39.3701 },
+  mass:    { kg:1, g:1000, mg:1e6, lb:2.20462, oz:35.274, t:0.001 },
+  temp:    { '°C':null, '°F':null, K:null },
+  area:    { 'm²':1, 'km²':1e-6, 'cm²':1e4, 'ft²':10.7639, ha:1e-4, acre:0.000247105 },
+  volume:  { L:1, mL:1000, 'm³':0.001, gal:0.264172, fl_oz:33.814, cup:4.22675 },
+  speed:   { 'm/s':1, 'km/h':3.6, mph:2.23694, knot:1.94384, 'ft/s':3.28084 },
+  time:    { s:1, ms:1000, min:1/60, h:1/3600, day:1/86400, week:1/604800, year:1/31536000 },
+  data:    { B:1, KB:1/1024, MB:1/1048576, GB:1/1073741824, TB:1/1099511627776, bit:8, Mbit:8/1048576 },
+};
+
+function updateConvUnits() {
+  const type = document.getElementById('convType').value;
+  const keys = Object.keys(UNITS[type]);
+  const opts = keys.map(k=>`<option value="${k}">${k}</option>`).join('');
+  document.getElementById('convFrom').innerHTML = opts;
+  document.getElementById('convTo').innerHTML   = opts;
+  if (keys[1]) document.getElementById('convTo').value = keys[1];
+  doConvert();
+}
+
+function doConvert() {
+  const type = document.getElementById('convType').value;
+  const val  = parseFloat(document.getElementById('convInput').value);
+  const from = document.getElementById('convFrom').value;
+  const to   = document.getElementById('convTo').value;
+  const out  = document.getElementById('convOutput');
+  if (isNaN(val)) { out.value=''; return; }
+  let result;
+  if (type==='temp') {
+    let c = from==='°C' ? val : from==='°F' ? (val-32)*5/9 : val-273.15;
+    result = to==='°C' ? c : to==='°F' ? c*9/5+32 : c+273.15;
+  } else {
+    result = (val / UNITS[type][from]) * UNITS[type][to];
+  }
+  out.value = parseFloat(result.toPrecision(10)).toString();
+}
+
+/* ── INIT ── */
+updateConvUnits();
+updateDisplay();
+</script>
+
+</body>
+</html>
